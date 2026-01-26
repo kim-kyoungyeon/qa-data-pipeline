@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  qa-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qa-data-pipeline
+    volumes:
+      - ./data/input:/app/data/input
+      - ./data/output:/app/data/output
+      - ./sample_data:/app/sample_data
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Override command for different operations
+    # command: ["flag", "data/input/input.xlsx", "-o", "data/output/flagged.xlsx"]
+
+  # Prometheus for metrics collection (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: qa-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    profiles:
+      - monitoring
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: qa-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./monitoring/grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring

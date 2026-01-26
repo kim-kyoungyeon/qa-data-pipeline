@@ -1,0 +1,146 @@
+# QA Data Pipeline Configuration
+# Version: 1.0.0
+
+# =============================================================================
+# Column Mappings (Korean regulatory data)
+# =============================================================================
+columns:
+  city: "도시명"
+  item: "항목명"
+  grade: "등급"
+  status: "이상유무 및 수정값"      # D열 (human judgment)
+  content: "조항내용"              # E열 (human input)
+  grade_data: "등급판단 데이터"     # F열
+  ai_law: "법령명"                 # G열 (AI extracted)
+  ai_content: "조항내용.1"         # H열 (AI extracted content)
+  reason: "이유"                   # I열
+  is_metro: "광역데이터여부"        # J열
+  json_data: "json"               # K열
+
+# =============================================================================
+# Validation Rules
+# =============================================================================
+validation:
+  min_content_length: 40          # E열 최소 길이
+  min_ai_content_length: 30       # H열 최소 길이 (autofill 기준)
+  min_status_length: 10           # D열 최소 길이 (overwrite 감지)
+
+# =============================================================================
+# Standardization Patterns (D열 정규화)
+# =============================================================================
+standardization:
+  # Priority order matters - first match wins
+  patterns:
+    ATTACH:
+      keywords: ["별표", "이미지", "첨부", "파일", "그림"]
+      description: "첨부파일/별표 확인 필요"
+      priority: 1
+      
+    AMBIG:
+      keywords: ["애매", "불충분", "여러개", "값이 없", "못찾", "불명확", "확인요"]
+      description: "애매한 케이스"
+      priority: 2
+      
+    LAW_FIX:
+      keywords: ["조항변경", "조례변경", "근거변경", "법령변경"]
+      description: "법령/조항 변경 필요"
+      priority: 3
+      
+    NUM_FIX:
+      keywords: ["수치변경", "값변경", "금액변경", "거리변경", "단위변경"]
+      description: "수치 변경 필요"
+      priority: 4
+      
+    ONLY_CLAUSE:
+      keywords: ["해당조항만", "해당 조항만", "조항만"]
+      description: "해당 조항만 적용"
+      priority: 5
+      
+    OK:
+      keywords: ["이상없음", "이상 없음", "정상", "문제없음"]
+      description: "이상 없음"
+      priority: 6
+      
+    AI_FILLED:
+      keywords: ["ai조항복붙", "ai복붙", "자동복사"]
+      description: "AI 데이터로 자동 채움"
+      priority: 7
+
+# =============================================================================
+# Flag Types (검수 상태)
+# =============================================================================
+flags:
+  # Critical - requires immediate attention
+  EMPTY_DE:
+    code: "EMPTY_DE"
+    description: "D,E 둘 다 비어있음 (완전 미검수)"
+    severity: "critical"
+    
+  WEAK_E:
+    code: "WEAK_E"
+    description: "E열 내용 부족 (근거 불충분)"
+    severity: "high"
+    
+  MISSING_AI:
+    code: "MISSING_AI"
+    description: "AI 추출 데이터 없음"
+    severity: "medium"
+    
+  # Warning - needs review
+  AMBIG:
+    code: "AMBIG"
+    description: "애매한 케이스"
+    severity: "medium"
+    
+  ATTACH:
+    code: "ATTACH"
+    description: "별표/첨부 확인 필요"
+    severity: "medium"
+    
+  MISMATCH:
+    code: "MISMATCH"
+    description: "Human vs AI 불일치"
+    severity: "low"
+    
+  # Info
+  OVERWRITTEN:
+    code: "OVERWRITTEN"
+    description: "원본 데이터 덮어쓰기됨"
+    severity: "warning"
+    
+  AI_FILLED:
+    code: "AI_FILLED"
+    description: "AI 데이터로 자동 채움"
+    severity: "info"
+    
+  OK:
+    code: "OK"
+    description: "검수 완료"
+    severity: "info"
+
+# =============================================================================
+# File Paths
+# =============================================================================
+paths:
+  input_dir: "data/input"
+  output_dir: "data/output"
+  sample_dir: "sample_data"
+  log_dir: "logs"
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+logging:
+  level: "INFO"
+  format: "json"  # json or text
+  file: "logs/pipeline.log"
+  max_size_mb: 10
+  backup_count: 5
+
+# =============================================================================
+# Metrics Configuration
+# =============================================================================
+metrics:
+  enabled: true
+  port: 8000
+  endpoint: "/metrics"
