@@ -3,6 +3,7 @@
 Automated QA validation pipeline for large-scale regulatory data processing.
 ## diagram 
 
+```mermaid
 graph LR
     subgraph Input["Input"]
         RAW[(Excel 11K rows)]
@@ -42,6 +43,10 @@ graph LR
     style F1 fill:#e74c3c,color:#fff
     style F5 fill:#27ae60,color:#fff
     style TST fill:#2ecc71,color:#fff
+```
+
+ 
+
     
 ## Features
 
