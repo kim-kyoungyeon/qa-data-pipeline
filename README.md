@@ -1,7 +1,48 @@
 # QA Data Pipeline
 
 Automated QA validation pipeline for large-scale regulatory data processing.
+## diagram 
 
+graph LR
+    subgraph Input["Input"]
+        RAW[(Excel 11K rows)]
+    end
+
+    subgraph Pipeline["5-Stage Pipeline"]
+        S1[1. Load & Filter]
+        S2[2. Standardize]
+        S3[3. Autofill H→E]
+        S4[4. Generate Flags]
+        S5[5. Export]
+    end
+
+    subgraph Flags["Flag System"]
+        F1[EMPTY_DE 1.0]
+        F2[WEAK_E 0.9]
+        F3[AMBIG 0.6]
+        F4[AI_FILLED 0.85]
+        F5[OK]
+    end
+
+    subgraph Output["Output"]
+        OUT1[(flagged.xlsx)]
+        OUT2[(final.xlsx)]
+    end
+
+    subgraph CICD["CI/CD"]
+        GHA[GitHub Actions]
+        TST[pytest 54 tests]
+    end
+
+    RAW --> S1 --> S2 --> S3 --> S4 --> S5
+    S4 --> F1 & F2 & F3 & F4 & F5
+    S5 --> OUT1 & OUT2
+    GHA --> TST
+
+    style F1 fill:#e74c3c,color:#fff
+    style F5 fill:#27ae60,color:#fff
+    style TST fill:#2ecc71,color:#fff
+    
 ## Features
 
 - **Flag Generation**: Detect data quality issues with confidence scores
