@@ -62,6 +62,9 @@ graph LR
 ## Features
 
 - **Flag Generation**: Detect data quality issues with confidence scores
+
+각 플래그는 신뢰도 점수(0.6~1.0)를 가지며, 점수가 높을수록 사람 검토 우선순위가 높습니다.
+
   - EMPTY_DE: Completely unreviewed rows
   - WEAK_E: Insufficient evidence
   - AMBIG: Ambiguous cases
@@ -113,7 +116,6 @@ python main.py data/input.xlsx --no-autofill --json
 | `-q, --quiet` | Errors only |
 
 ## Pipeline Stages
-> 각 플래그는 신뢰도 점수(0.6~1.0)를 가지며, 점수가 높을수록 사람 검토 우선순위가 높습니다.
 ```
 Input Excel
     |
@@ -255,6 +257,8 @@ stats = get_flag_statistics(df)
 | Container | Docker |
 | CI/CD | GitHub Actions |
 
-## License
+## Roadmap
 
-MIT
+- **Phase B**: FastAPI + Streamlit 검수 현황 대시보드
+- **Phase C**: 멀티 LLM 교차 검증 (Claude/DeepSeek API) + 자동 리포트
+- **Phase D**: Airflow 스케줄링 기반 정기 실행 자동화
