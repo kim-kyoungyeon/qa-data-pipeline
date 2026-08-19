@@ -260,5 +260,5 @@ stats = get_flag_statistics(df)
 ## Roadmap
 
 - **Phase B**: FastAPI + Streamlit 검수 현황 대시보드
-- **Phase C**: 멀티 LLM 교차 검증 (Claude/DeepSeek API) + 자동 리포트
+- **Phase C**: 멀티 LLM 교차 검증 (Claude/GPT/gemini API) + 자동 리포트
 - **Phase D**: Airflow 스케줄링 기반 정기 실행 자동화
