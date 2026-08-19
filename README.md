@@ -73,7 +73,7 @@ graph LR
 - **Label Standardization**: Normalize D column variations
 - **Auto-fill**: Fill empty E columns from AI-extracted data (H column)
 - **Pipeline Orchestration**: Run all stages in order with progress tracking
-- **Metrics**: Prometheus-compatible metrics collection
+- **Metrics**: Prometheus-client 기반 실행 지표 계측 (runs/rows/flags/duration)
 - **Logging**: Structured JSON logging
 
 ## Installation
@@ -113,7 +113,7 @@ python main.py data/input.xlsx --no-autofill --json
 | `-q, --quiet` | Errors only |
 
 ## Pipeline Stages
-
+> 각 플래그는 신뢰도 점수(0.6~1.0)를 가지며, 점수가 높을수록 사람 검토 우선순위가 높습니다.
 ```
 Input Excel
     |
