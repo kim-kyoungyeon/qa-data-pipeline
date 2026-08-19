@@ -1,6 +1,17 @@
 # QA Data Pipeline
 
 Automated QA validation pipeline for large-scale regulatory data processing.
+
+> **Problem**: 228개 지자체 × 50개 항목(11,000+ rows)의 조례 데이터를 
+> 제한된 검수 인력으로 전수 확인하는 것이 불가능한 상황에서, LLM이 생성한 
+> 데이터의 환각/오매칭을 사람이 놓치는 리스크가 있었습니다.
+>
+> **Approach**: 모든 행을 동일하게 검수하는 대신, 신뢰도 점수 기반 
+> 플래그로 고위험 데이터를 분리해 사람이 우선 검토하도록 설계했습니다.
+> (risk-based triage, human-in-the-loop)
+>
+> **Result**: 수작업 대비 검수 시간 70% 단축, pytest 54개 테스트 100% 통과
+
 ## diagram 
 
 ```mermaid
