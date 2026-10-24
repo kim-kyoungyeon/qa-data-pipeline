@@ -12,4 +12,5 @@ prometheus-client>=0.17.0
 
 # Optional: Code quality
 ruff>=0.1.0
+flake8>=6.0.0
 mypy>=1.0.0

@@ -3,7 +3,6 @@
 This module provides typed access to configuration values loaded from YAML.
 """
 
-import os
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional
@@ -59,7 +58,7 @@ class PathConfig:
     log_dir: str = "logs"
 
 
-@dataclass 
+@dataclass
 class LoggingConfig:
     """Logging configuration."""
     level: str = "INFO"
@@ -79,16 +78,16 @@ class MetricsConfig:
 
 class Config:
     """Main configuration class with typed access."""
-    
+
     def __init__(self, config_path: Optional[str] = None):
         """Load configuration from YAML file.
-        
+
         Args:
             config_path: Path to config file. If None, uses default.
         """
         self._raw: Dict[str, Any] = {}
         self._load(config_path)
-        
+
         # Parsed configs
         self.columns = ColumnConfig()
         self.validation = ValidationConfig()
@@ -97,9 +96,9 @@ class Config:
         self.metrics = MetricsConfig()
         self.patterns: Dict[str, PatternConfig] = {}
         self.flags: Dict[str, FlagConfig] = {}
-        
+
         self._parse()
-    
+
     def _load(self, config_path: Optional[str] = None):
         """Load raw YAML config."""
         if config_path is None:
@@ -113,11 +112,11 @@ class Config:
                 if path.exists():
                     config_path = str(path)
                     break
-        
+
         if config_path and Path(config_path).exists():
             with open(config_path, 'r', encoding='utf-8') as f:
                 self._raw = yaml.safe_load(f) or {}
-    
+
     def _parse(self):
         """Parse raw config into typed objects."""
         # Columns
@@ -136,7 +135,7 @@ class Config:
                 is_metro=cols.get("is_metro", self.columns.is_metro),
                 json_data=cols.get("json_data", self.columns.json_data),
             )
-        
+
         # Validation
         if "validation" in self._raw:
             val = self._raw["validation"]
@@ -145,7 +144,7 @@ class Config:
                 min_ai_content_length=val.get("min_ai_content_length", 30),
                 min_status_length=val.get("min_status_length", 10),
             )
-        
+
         # Paths
         if "paths" in self._raw:
             p = self._raw["paths"]
@@ -155,7 +154,7 @@ class Config:
                 sample_dir=p.get("sample_dir", "sample_data"),
                 log_dir=p.get("log_dir", "logs"),
             )
-        
+
         # Logging
         if "logging" in self._raw:
             log = self._raw["logging"]
@@ -166,7 +165,7 @@ class Config:
                 max_size_mb=log.get("max_size_mb", 10),
                 backup_count=log.get("backup_count", 5),
             )
-        
+
         # Metrics
         if "metrics" in self._raw:
             met = self._raw["metrics"]
@@ -175,7 +174,7 @@ class Config:
                 port=met.get("port", 8000),
                 endpoint=met.get("endpoint", "/metrics"),
             )
-        
+
         # Standardization patterns
         if "standardization" in self._raw and "patterns" in self._raw["standardization"]:
             for name, pat in self._raw["standardization"]["patterns"].items():
@@ -184,7 +183,7 @@ class Config:
                     description=pat.get("description", ""),
                     priority=pat.get("priority", 99),
                 )
-        
+
         # Flags
         if "flags" in self._raw:
             for name, flag in self._raw["flags"].items():
@@ -193,29 +192,29 @@ class Config:
                     description=flag.get("description", ""),
                     severity=flag.get("severity", "info"),
                 )
-    
+
     # Convenience properties for backward compatibility
     @property
     def min_content_length(self) -> int:
         return self.validation.min_content_length
-    
+
     @property
     def min_ai_content_length(self) -> int:
         return self.validation.min_ai_content_length
-    
+
     @property
     def ok_patterns(self) -> List[str]:
         """Get OK status patterns."""
         if "OK" in self.patterns:
             return self.patterns["OK"].keywords
         return ["이상없음", "이상 없음", "해당없음", "정상"]
-    
+
     def get_pattern_keywords(self, pattern_name: str) -> List[str]:
         """Get keywords for a pattern."""
         if pattern_name in self.patterns:
             return self.patterns[pattern_name].keywords
         return []
-    
+
     def get_flag_severity(self, flag_name: str) -> str:
         """Get severity for a flag."""
         if flag_name in self.flags:
@@ -229,10 +228,10 @@ config = Config()
 
 def reload_config(config_path: Optional[str] = None) -> Config:
     """Reload configuration from file.
-    
+
     Args:
         config_path: Optional path to config file
-        
+
     Returns:
         New Config instance
     """
