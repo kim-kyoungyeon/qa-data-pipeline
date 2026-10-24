@@ -18,15 +18,12 @@ from typing import Dict, Any, Optional, List, Callable
 from datetime import datetime
 import pandas as pd
 
-from .config import config as app_config
 from .flag_generator import (
     process_dataframe as generate_flags,
     get_flag_statistics,
-    FlagType,
 )
 from .standardize import standardize_dataframe, filter_by_item_range
 from .autofill import autofill_from_ai
-from .data_merger import merge_flagged_to_original, find_overwritten_rows
 
 
 @dataclass
@@ -34,16 +31,16 @@ class PipelineConfig:
     """Configuration for pipeline execution."""
     input_file: str
     output_dir: str = "output"
-    
+
     # Stage toggles
     run_standardize: bool = True
     run_flag: bool = True
     run_autofill: bool = True
-    
+
     # Filters
     item_range_start: Optional[str] = None  # e.g., "4-1"
     item_range_end: Optional[str] = None    # e.g., "5-2"
-    
+
     # Output options
     save_intermediate: bool = False
     export_format: str = "xlsx"  # xlsx or csv
@@ -71,7 +68,7 @@ class PipelineResult:
     stages: List[StageResult] = field(default_factory=list)
     final_stats: Dict[str, Any] = field(default_factory=dict)
     output_files: List[str] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -98,10 +95,10 @@ class PipelineResult:
 
 class Pipeline:
     """Main pipeline orchestrator."""
-    
+
     def __init__(self, cfg: PipelineConfig):
         """Initialize pipeline with configuration.
-        
+
         Args:
             cfg: Pipeline configuration
         """
@@ -109,21 +106,21 @@ class Pipeline:
         self.df: Optional[pd.DataFrame] = None
         self.flagged_df: Optional[pd.DataFrame] = None
         self.stages: List[StageResult] = []
-        
+
         # Callbacks for progress reporting
         self._on_stage_start: Optional[Callable[[str], None]] = None
         self._on_stage_end: Optional[Callable[[StageResult], None]] = None
-    
+
     def on_stage_start(self, callback: Callable[[str], None]) -> "Pipeline":
         """Set callback for stage start events."""
         self._on_stage_start = callback
         return self
-    
+
     def on_stage_end(self, callback: Callable[[StageResult], None]) -> "Pipeline":
         """Set callback for stage end events."""
         self._on_stage_end = callback
         return self
-    
+
     def _run_stage(
         self,
         name: str,
@@ -131,20 +128,20 @@ class Pipeline:
         input_rows: int
     ) -> StageResult:
         """Run a single pipeline stage with timing.
-        
+
         Args:
             name: Stage name
             func: Function to execute
             input_rows: Number of input rows
-            
+
         Returns:
             StageResult with timing and stats
         """
         if self._on_stage_start:
             self._on_stage_start(name)
-        
+
         start = datetime.now()
-        
+
         try:
             result = func()
             success = True
@@ -153,10 +150,10 @@ class Pipeline:
             result = {"output_rows": 0, "stats": {}}
             success = False
             error = str(e)
-        
+
         end = datetime.now()
         duration_ms = (end - start).total_seconds() * 1000
-        
+
         stage_result = StageResult(
             name=name,
             success=success,
@@ -166,27 +163,27 @@ class Pipeline:
             stats=result.get("stats", {}),
             error=error,
         )
-        
+
         self.stages.append(stage_result)
-        
+
         if self._on_stage_end:
             self._on_stage_end(stage_result)
-        
+
         return stage_result
-    
+
     def run(self) -> PipelineResult:
         """Execute the full pipeline.
-        
+
         Returns:
             PipelineResult with all stage results
         """
         start_time = datetime.now()
         self.stages = []
         output_files = []
-        
+
         # Ensure output directory exists
         os.makedirs(self.cfg.output_dir, exist_ok=True)
-        
+
         # Stage 1: Load
         def load_stage():
             self.df = pd.read_excel(self.cfg.input_file)
@@ -197,13 +194,13 @@ class Pipeline:
                     "file": self.cfg.input_file,
                 }
             }
-        
+
         load_result = self._run_stage("load", load_stage, 0)
         if not load_result.success:
             return self._finalize(start_time, False, output_files)
-        
+
         current_rows = len(self.df)
-        
+
         # Stage 1.5: Filter by item range (optional)
         if self.cfg.item_range_start and self.cfg.item_range_end:
             def filter_stage():
@@ -218,12 +215,12 @@ class Pipeline:
                         "range": f"{self.cfg.item_range_start} ~ {self.cfg.item_range_end}"
                     }
                 }
-            
+
             filter_result = self._run_stage("filter", filter_stage, current_rows)
             if not filter_result.success:
                 return self._finalize(start_time, False, output_files)
             current_rows = len(self.df)
-        
+
         # Stage 2: Standardize
         if self.cfg.run_standardize:
             def standardize_stage():
@@ -232,15 +229,15 @@ class Pipeline:
                     "output_rows": len(self.df),
                     "stats": stats
                 }
-            
+
             std_result = self._run_stage("standardize", standardize_stage, current_rows)
             if not std_result.success:
                 return self._finalize(start_time, False, output_files)
-            
+
             if self.cfg.save_intermediate:
                 path = self._save_df(self.df, "standardized")
                 output_files.append(path)
-        
+
         # Stage 3: Autofill
         if self.cfg.run_autofill:
             def autofill_stage():
@@ -249,15 +246,15 @@ class Pipeline:
                     "output_rows": len(self.df),
                     "stats": stats
                 }
-            
+
             auto_result = self._run_stage("autofill", autofill_stage, current_rows)
             if not auto_result.success:
                 return self._finalize(start_time, False, output_files)
-            
+
             if self.cfg.save_intermediate:
                 path = self._save_df(self.df, "autofilled")
                 output_files.append(path)
-        
+
         # Stage 4: Flag
         if self.cfg.run_flag:
             def flag_stage():
@@ -267,15 +264,15 @@ class Pipeline:
                     "output_rows": len(self.flagged_df),
                     "stats": stats
                 }
-            
+
             flag_result = self._run_stage("flag", flag_stage, current_rows)
             if not flag_result.success:
                 return self._finalize(start_time, False, output_files)
-            
+
             # Always save flagged results
             path = self._save_df(self.flagged_df, "flagged")
             output_files.append(path)
-        
+
         # Stage 5: Export final
         def export_stage():
             path = self._save_df(self.df, "final")
@@ -284,24 +281,24 @@ class Pipeline:
                 "output_rows": len(self.df),
                 "stats": {"output_file": path}
             }
-        
+
         export_result = self._run_stage("export", export_stage, current_rows)
-        
+
         return self._finalize(start_time, export_result.success, output_files)
-    
+
     def _save_df(self, df: pd.DataFrame, suffix: str) -> str:
         """Save dataframe to file.
-        
+
         Args:
             df: DataFrame to save
             suffix: Filename suffix
-            
+
         Returns:
             Output file path
         """
         base_name = Path(self.cfg.input_file).stem
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         if self.cfg.export_format == "csv":
             filename = f"{base_name}_{suffix}_{timestamp}.csv"
             path = os.path.join(self.cfg.output_dir, filename)
@@ -310,9 +307,9 @@ class Pipeline:
             filename = f"{base_name}_{suffix}_{timestamp}.xlsx"
             path = os.path.join(self.cfg.output_dir, filename)
             df.to_excel(path, index=False)
-        
+
         return path
-    
+
     def _finalize(
         self,
         start_time: datetime,
@@ -320,18 +317,18 @@ class Pipeline:
         output_files: List[str]
     ) -> PipelineResult:
         """Finalize pipeline execution.
-        
+
         Args:
             start_time: Pipeline start time
             success: Overall success status
             output_files: List of output file paths
-            
+
         Returns:
             PipelineResult
         """
         end_time = datetime.now()
         total_duration = (end_time - start_time).total_seconds() * 1000
-        
+
         # Compute final stats
         final_stats = {}
         if self.df is not None:
@@ -341,7 +338,7 @@ class Pipeline:
             final_stats["flagged_pct"] = round(
                 len(self.flagged_df) / len(self.df) * 100, 2
             ) if self.df is not None and len(self.df) > 0 else 0
-        
+
         return PipelineResult(
             success=success,
             start_time=start_time,
@@ -360,13 +357,13 @@ def run_pipeline(
     verbose: bool = True,
 ) -> PipelineResult:
     """Convenience function to run pipeline with default settings.
-    
+
     Args:
         input_file: Input Excel file path
         output_dir: Output directory
         item_range: Optional (start, end) tuple for item filtering
         verbose: Print progress to console
-        
+
     Returns:
         PipelineResult
     """
@@ -377,17 +374,17 @@ def run_pipeline(
         item_range_end=item_range[1] if item_range else None,
         save_intermediate=False,
     )
-    
+
     pipeline = Pipeline(cfg)
-    
+
     if verbose:
         def on_start(name: str):
             print(f"[STAGE] {name}...")
-        
+
         def on_end(result: StageResult):
             status = "OK" if result.success else "FAIL"
             print(f"[{status}] {result.name}: {result.output_rows} rows ({result.duration_ms}ms)")
-        
+
         pipeline.on_stage_start(on_start).on_stage_end(on_end)
-    
+
     return pipeline.run()

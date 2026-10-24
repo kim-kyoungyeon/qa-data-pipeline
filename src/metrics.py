@@ -17,7 +17,6 @@ try:
         Histogram,
         CollectorRegistry,
         generate_latest,
-        push_to_gateway,
     )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
@@ -35,7 +34,7 @@ class MetricsSnapshot:
     flags_generated_total: int = 0
     stage_duration_seconds: Dict[str, float] = field(default_factory=dict)
     current_stage: str = ""
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -51,12 +50,12 @@ class MetricsSnapshot:
 
 class MetricsCollector:
     """Collector for pipeline metrics."""
-    
+
     def __init__(self, use_prometheus: bool = True):
         """Initialize metrics collector."""
         self.use_prometheus = use_prometheus and PROMETHEUS_AVAILABLE
         self._registry = CollectorRegistry() if self.use_prometheus else None
-        
+
         # Internal counters
         self._counters: Dict[str, int] = {
             "pipeline_runs_total": 0,
@@ -68,10 +67,10 @@ class MetricsCollector:
         self._stage_durations: Dict[str, float] = {}
         self._current_stage: str = ""
         self._stage_start_time: Optional[float] = None
-        
+
         if self.use_prometheus:
             self._init_prometheus()
-    
+
     def _init_prometheus(self):
         """Initialize Prometheus metrics."""
         self._prom_runs = Counter(
@@ -95,49 +94,49 @@ class MetricsCollector:
             "qa_pipeline_current_stage", "Current stage",
             registry=self._registry
         )
-    
+
     def increment_runs(self, success: bool = True):
         """Increment pipeline run counter."""
         self._counters["pipeline_runs_total"] += 1
         key = "pipeline_runs_success" if success else "pipeline_runs_failed"
         self._counters[key] += 1
-        
+
         if self.use_prometheus:
             self._prom_runs.labels(status="success" if success else "failed").inc()
-    
+
     def add_rows_processed(self, count: int):
         """Add to rows processed counter."""
         self._counters["rows_processed_total"] += count
         if self.use_prometheus:
             self._prom_rows.inc(count)
-    
+
     def add_flags_generated(self, flag_type: str, count: int = 1):
         """Add to flags generated counter."""
         self._counters["flags_generated_total"] += count
         if self.use_prometheus:
             self._prom_flags.labels(flag_type=flag_type).inc(count)
-    
+
     def start_stage(self, stage_name: str):
         """Mark start of a pipeline stage."""
         self._current_stage = stage_name
         self._stage_start_time = time.time()
-        
+
         if self.use_prometheus:
             stage_map = {"load": 1, "filter": 2, "standardize": 3,
-                        "autofill": 4, "flag": 5, "export": 6}
+                         "autofill": 4, "flag": 5, "export": 6}
             self._prom_current_stage.set(stage_map.get(stage_name, 0))
-    
+
     def end_stage(self, stage_name: str):
         """Mark end of a pipeline stage."""
         if self._stage_start_time:
             duration = time.time() - self._stage_start_time
             self._stage_durations[stage_name] = duration
-            
+
             if self.use_prometheus:
                 self._prom_stage_duration.labels(stage=stage_name).observe(duration)
-        
+
         self._stage_start_time = None
-    
+
     def get_snapshot(self) -> MetricsSnapshot:
         """Get current metrics snapshot."""
         return MetricsSnapshot(
@@ -149,14 +148,14 @@ class MetricsCollector:
             stage_duration_seconds=dict(self._stage_durations),
             current_stage=self._current_stage,
         )
-    
+
     def reset(self):
         """Reset all metrics."""
         for key in self._counters:
             self._counters[key] = 0
         self._stage_durations.clear()
         self._current_stage = ""
-    
+
     def export_prometheus(self) -> Optional[bytes]:
         """Export metrics in Prometheus format."""
         if self.use_prometheus and self._registry:
@@ -195,17 +194,22 @@ def timed_stage(stage_name: str):
 def increment_runs(success: bool = True):
     get_collector().increment_runs(success)
 
+
 def add_rows_processed(count: int):
     get_collector().add_rows_processed(count)
+
 
 def add_flags_generated(flag_type: str, count: int = 1):
     get_collector().add_flags_generated(flag_type, count)
 
+
 def start_stage(stage_name: str):
     get_collector().start_stage(stage_name)
 
+
 def end_stage(stage_name: str):
     get_collector().end_stage(stage_name)
+
 
 def get_snapshot() -> MetricsSnapshot:
     return get_collector().get_snapshot()

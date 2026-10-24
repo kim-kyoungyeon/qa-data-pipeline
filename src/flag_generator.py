@@ -35,7 +35,7 @@ class FlagType(Enum):
     AI_FILLED = "AI_FILLED(AI복붙)"
     OK = "OK(이상없음)"
     ETC = "ETC(기타)"
-    
+
     @property
     def needs_review(self) -> bool:
         """Check if this flag type requires manual review."""
@@ -45,7 +45,7 @@ class FlagType(Enum):
             FlagType.AMBIG,
             FlagType.ATTACH,
         )
-    
+
     @property
     def priority(self) -> int:
         """Get priority for sorting (lower = higher priority)."""
@@ -74,34 +74,34 @@ class FlagResult:
     content_e: str
     flags: List[FlagType] = field(default_factory=list)
     confidence: float = 1.0
-    
+
     @property
     def content_e_preview(self) -> str:
         """Get truncated preview of E column."""
         return self.content_e[:160].replace("\n", " ")
-    
+
     @property
     def flag_names(self) -> List[str]:
         """Get list of flag value strings."""
         return [f.value for f in self.flags]
-    
+
     @property
     def flag_string(self) -> str:
         """Get comma-separated flag string."""
         return ", ".join(self.flag_names)
-    
+
     @property
     def needs_review(self) -> bool:
         """Check if this result needs manual review."""
         return any(f.needs_review for f in self.flags) or self.confidence < 0.8
-    
+
     @property
     def primary_flag(self) -> Optional[FlagType]:
         """Get the highest priority flag."""
         if not self.flags:
             return None
         return min(self.flags, key=lambda f: f.priority)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for DataFrame."""
         return {
@@ -152,10 +152,10 @@ NUMERIC_CHANGE_PATTERN = re.compile(r'\d+\s*[-→>]+\s*\d+')
 
 def sanitize(value: Any) -> str:
     """Clean and convert value to string.
-    
+
     Args:
         value: Any input value
-        
+
     Returns:
         Cleaned string with whitespace trimmed
     """
@@ -166,10 +166,10 @@ def sanitize(value: Any) -> str:
 
 def normalize_text(text: str) -> str:
     """Normalize text for pattern matching.
-    
+
     Args:
         text: Input text
-        
+
     Returns:
         Lowercase text with extra whitespace removed
     """
@@ -180,10 +180,10 @@ def normalize_text(text: str) -> str:
 
 def extract_item_id(item_text: str) -> Optional[str]:
     """Extract item ID like '4-9' from '4-9 자동이체 감면금액'.
-    
+
     Args:
         item_text: Item name string
-        
+
     Returns:
         Item ID or None
     """
@@ -193,11 +193,11 @@ def extract_item_id(item_text: str) -> Optional[str]:
 
 def check_pattern(text: str, patterns: List[str]) -> bool:
     """Check if any pattern exists in text.
-    
+
     Args:
         text: Text to search in (should be normalized)
         patterns: List of patterns to search for
-        
+
     Returns:
         True if any pattern found
     """
@@ -207,10 +207,10 @@ def check_pattern(text: str, patterns: List[str]) -> bool:
 
 def is_ok_status(status_text: str) -> bool:
     """Check if status indicates 'OK/No issues'.
-    
+
     Args:
         status_text: D column value
-        
+
     Returns:
         True if status is OK
     """
@@ -219,61 +219,61 @@ def is_ok_status(status_text: str) -> bool:
 
 def detect_flags(status: str, content: str) -> Tuple[List[FlagType], float]:
     """Detect all applicable flags for given D and E values.
-    
+
     Args:
         status: D column (이상유무 및 수정값)
         content: E column (조항내용)
-        
+
     Returns:
         Tuple of (list of flags, confidence score 0.0-1.0)
     """
     d = sanitize(status)
     e = sanitize(content)
     combined = f"{d} {e}"
-    
+
     flags: List[FlagType] = []
     confidence = 1.0
-    
+
     # Get min content length from config
     min_content_len = config.validation.min_content_length
-    
+
     # Priority 1: Empty check (highest priority)
     if d == "" and e == "":
         return [FlagType.EMPTY_DE], 1.0
-    
+
     # Priority 2: Weak content
     if d == "" and len(e) < min_content_len:
         return [FlagType.WEAK_E], 0.9
-    
+
     # Priority 3: OK status - return early
     if check_pattern(d, PATTERNS[FlagType.OK]):
         return [FlagType.OK], 1.0
-    
+
     # Priority 4: AI filled
     if check_pattern(combined, PATTERNS[FlagType.AI_FILLED]):
         flags.append(FlagType.AI_FILLED)
         confidence = min(confidence, 0.85)
-    
+
     # Priority 5: Attachment (needs manual review)
     if check_pattern(combined, PATTERNS[FlagType.ATTACH]):
         flags.append(FlagType.ATTACH)
         confidence = min(confidence, 0.7)
-    
+
     # Priority 6: Law/regulation changes
     if check_pattern(combined, PATTERNS[FlagType.LAW_FIX]):
         flags.append(FlagType.LAW_FIX)
         confidence = min(confidence, 0.8)
-    
+
     # Priority 7: Numeric changes (keyword or regex)
     if check_pattern(combined, PATTERNS[FlagType.NUM_FIX]) or NUMERIC_CHANGE_PATTERN.search(d):
         flags.append(FlagType.NUM_FIX)
         confidence = min(confidence, 0.8)
-    
+
     # Priority 8: Ambiguous cases
     if check_pattern(combined, PATTERNS[FlagType.AMBIG]):
         flags.append(FlagType.AMBIG)
         confidence = min(confidence, 0.6)
-    
+
     # If no specific flags but has content
     if not flags:
         if d and len(d) > 5:
@@ -283,17 +283,17 @@ def detect_flags(status: str, content: str) -> Tuple[List[FlagType], float]:
             # Has sufficient content but no D value - likely OK but uncertain
             flags.append(FlagType.ETC)
             confidence = 0.7
-    
+
     return flags, confidence
 
 
 def generate_flags(status: str, content: str) -> List[str]:
     """Generate validation flags (simplified interface).
-    
+
     Args:
         status: D column (이상유무 및 수정값)
         content: E column (조항내용)
-        
+
     Returns:
         List of flag strings (excludes OK)
     """
@@ -304,11 +304,11 @@ def generate_flags(status: str, content: str) -> List[str]:
 
 def canonicalize_label(status: str, content: str = "") -> str:
     """Canonicalize D column to standard label.
-    
+
     Args:
         status: D column value
         content: E column value (optional)
-        
+
     Returns:
         Standard label string
     """
@@ -320,11 +320,11 @@ def canonicalize_label(status: str, content: str = "") -> str:
 
 def process_row(idx: int, row: pd.Series) -> Optional[FlagResult]:
     """Process a single row and generate flag result.
-    
+
     Args:
         idx: Row index
         row: DataFrame row
-        
+
     Returns:
         FlagResult if flags detected (excluding OK), None otherwise
     """
@@ -332,17 +332,17 @@ def process_row(idx: int, row: pd.Series) -> Optional[FlagResult]:
     col_e = config.columns.content
     col_city = config.columns.city
     col_item = config.columns.item
-    
+
     d = sanitize(row.get(col_d, ""))
     e = sanitize(row.get(col_e, ""))
     item = sanitize(row.get(col_item, ""))
-    
+
     flags, confidence = detect_flags(d, e)
-    
+
     # Skip OK rows - they don't need attention
     if flags == [FlagType.OK]:
         return None
-    
+
     return FlagResult(
         row_index=idx,
         city=sanitize(row.get(col_city, "")),
@@ -357,35 +357,35 @@ def process_row(idx: int, row: pd.Series) -> Optional[FlagResult]:
 
 def process_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Process entire dataframe and generate flags.
-    
+
     Args:
         df: Input dataframe with D and E columns
-        
+
     Returns:
         DataFrame with flagged rows only
     """
     flagged_rows = []
-    
+
     for idx, row in df.iterrows():
         result = process_row(idx, row)
         if result:
             flagged_rows.append(result.to_dict())
-    
+
     return pd.DataFrame(flagged_rows)
 
 
 def get_flag_statistics(df: pd.DataFrame) -> Dict[str, Any]:
     """Get comprehensive statistics of flags.
-    
+
     Args:
         df: Input dataframe (original, not flagged)
-        
+
     Returns:
         Dictionary with flag statistics
     """
     col_d = config.columns.status
     col_e = config.columns.content
-    
+
     stats = {
         "total_rows": len(df),
         "flag_counts": {f.name: 0 for f in FlagType},
@@ -393,51 +393,51 @@ def get_flag_statistics(df: pd.DataFrame) -> Dict[str, Any]:
         "confidence_avg": 0.0,
         "confidence_low": 0,  # confidence < 0.8
     }
-    
+
     confidence_sum = 0.0
     processed = 0
-    
+
     for _, row in df.iterrows():
         d = sanitize(row.get(col_d, ""))
         e = sanitize(row.get(col_e, ""))
         flags, confidence = detect_flags(d, e)
-        
+
         for flag in flags:
             stats["flag_counts"][flag.name] += 1
-        
+
         if any(f.needs_review for f in flags):
             stats["needs_review"] += 1
-        
+
         if confidence < 0.8:
             stats["confidence_low"] += 1
-        
+
         confidence_sum += confidence
         processed += 1
-    
+
     if processed > 0:
         stats["confidence_avg"] = round(confidence_sum / processed, 3)
-    
+
     # Sort flag counts by value descending
     stats["flag_counts"] = dict(
         sorted(stats["flag_counts"].items(), key=lambda x: -x[1])
     )
-    
+
     return stats
 
 
 def filter_by_flag(df: pd.DataFrame, flag_type: FlagType) -> pd.DataFrame:
     """Filter dataframe to rows with specific flag.
-    
+
     Args:
         df: Flagged dataframe from process_dataframe()
         flag_type: Flag type to filter by
-        
+
     Returns:
         Filtered dataframe
     """
     if "flags" not in df.columns:
         return pd.DataFrame()
-    
+
     # Use regex=False to avoid interpreting parentheses as groups
     mask = df["flags"].str.contains(flag_type.value, case=False, na=False, regex=False)
     return df[mask].copy()
@@ -445,23 +445,23 @@ def filter_by_flag(df: pd.DataFrame, flag_type: FlagType) -> pd.DataFrame:
 
 def get_review_queue(df: pd.DataFrame) -> pd.DataFrame:
     """Get rows that need manual review, sorted by priority.
-    
+
     Args:
         df: Flagged dataframe from process_dataframe()
-        
+
     Returns:
         Sorted dataframe of items needing review
     """
     if "needs_review" not in df.columns:
         return pd.DataFrame()
-    
-    review_df = df[df["needs_review"] == True].copy()
-    
+
+    review_df = df[df["needs_review"]].copy()
+
     # Sort by flag count (desc), then confidence (asc)
     if len(review_df) > 0:
         review_df = review_df.sort_values(
             ["flag_count", "confidence"],
             ascending=[False, True]
         )
-    
+
     return review_df
